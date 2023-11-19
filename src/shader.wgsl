@@ -718,7 +718,7 @@ fn fs_main(
             y += step;
         }
         
-        return s * vec4<f32>(paint.inner_color.rgb, value);
+        return s * vec4<f32>(paint.inner_color.rgb, value * paint.inner_color.a);
     }
 
     if(prim.prim_type == 8u) { // vgerGlyph
