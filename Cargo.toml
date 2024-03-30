@@ -2,7 +2,7 @@
 resolver = "2" # What does this do?
 
 [package]
-name = "floem-vger"
+name = "floem-vger-rs"
 description = "Unofficial vger fork for Floem"
 version = "0.2.7"
 license = "MIT"
@@ -14,11 +14,12 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-wgpu = "0.18.0"
+wgpu = "0.19.0"
 euclid = "0.22.7"
-fontdue = "0.7.2"
+fontdue = "0.8.0"
 rect_packer = "0.2.1"
-floem-cosmic-text = "0.7.0"
+# floem-cosmic-text = "0.7.0"
+floem-cosmic-text = { path = "../floem-cosmic-text" }
 
 [dev-dependencies]
 png = "0.17.6"
