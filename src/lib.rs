@@ -717,7 +717,7 @@ impl Vger {
             ];
             prim.paint = paint_index.index as u32;
             prim.scissor = self.add_scissor() as u32;
-
+            prim.xform = self.add_xform();
             self.render(prim);
         }
     }
