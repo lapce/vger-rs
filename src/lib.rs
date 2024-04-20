@@ -389,42 +389,9 @@ impl Vger {
             );
 
             rpass.set_bind_group(1, &self.uniform_bind_group, &[]);
-            rpass.set_bind_group(2, &self.cache_bind_group, &[]);
 
-            let scene = &self.scenes[self.cur_scene];
-            let n = scene.prims[self.cur_layer].len();
-            let mut m: u32 = 0;
-            let mut start: u32 = 0;
-
-            for i in 0..n {
-                let prim = &scene.prims[self.cur_layer][i];
-                let image_id = scene.paints[prim.paint as usize].image;
-
-                // Image changed, render.
-                if image_id >= 0 && image_id != current_texture {
-                    // println!("image changed: encoding {:?} prims", m);
-                    if m > 0 {
-                        rpass.draw(
-                            /*vertices*/ 0..4,
-                            /*instances*/ start..(start + m),
-                        );
-                    }
-
-                    current_texture = image_id;
-                    rpass.set_bind_group(
-                        2,
-                        self.image_bind_groups[image_id as usize].as_ref().unwrap(),
-                        &[],
-                    );
-
-                    start += m;
-                    m = 0;
-                }
-
-                m += 1;
-            }
-
-            // println!("encoding {:?} prims", m);
+            let n = self.scenes[self.cur_scene].prims[self.cur_layer].len();
+            // println!("encoding {:?} prims", n);
 
             if m > 0 {
                 rpass.draw(
@@ -679,6 +646,17 @@ impl Vger {
 
             self.render(prim);
         }
+    }
+
+    fn setup_layout(&mut self, text: &str, size: u32, max_width: Option<f32>) {
+        let scale = self.device_px_ratio;
+
+        self.layout.reset(&LayoutSettings {
+            max_width: max_width.map(|w| w * scale),
+            ..LayoutSettings::default()
+        });
+
+        let scaled_size = size as f32 * scale;
 
         self.path_scanner.segments.clear();
     }
@@ -856,6 +834,10 @@ impl Vger {
                 m.radius = radius;
             }
         }
+    }
+
+    pub fn set_z_index(&mut self, z_index: i32) {
+        self.cur_z_index = z_index;
     }
 
     /// Resets the current scissor rect.

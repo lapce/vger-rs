@@ -96,15 +96,6 @@ impl Scene {
     }
 
     pub fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
-        let mut keys: Vec<i32> = self.depthed_prims.keys().copied().collect();
-        keys.sort();
-        for z_index in keys {
-            let mut prims = self.depthed_prims.remove(&z_index).unwrap();
-            self.prims[0].append(&mut prims);
-        }
-
-        let mut update_bind_groups = false;
-
         for i in 0..4 {
             update_bind_groups |= self.prims[i].update(device, queue);
         }
