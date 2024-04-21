@@ -676,7 +676,7 @@ impl Vger {
             prim.quad_bounds[2] = x_interval.b;
             prim.quad_bounds[3] = self.path_scanner.interval.b;
             prim.tex_bounds = prim.quad_bounds;
-
+            prim.xform = self.add_xform() as u32;
             self.render(prim);
         }
 
@@ -717,7 +717,7 @@ impl Vger {
             ];
             prim.paint = paint_index.index as u32;
             prim.scissor = self.add_scissor() as u32;
-
+            prim.xform = self.add_xform() as u32;
             self.render(prim);
         }
     }
