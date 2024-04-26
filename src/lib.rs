@@ -461,7 +461,7 @@ impl Vger {
         prim.quad_bounds = [c.x - radius, c.y - radius, c.x + radius, c.y + radius];
         prim.tex_bounds = prim.quad_bounds;
         prim.scissor = self.add_scissor() as u32;
-        
+
         prim.xform = self.add_xform() as u32;
         self.render(prim);
     }
@@ -498,7 +498,7 @@ impl Vger {
         ];
         prim.tex_bounds = prim.quad_bounds;
         prim.scissor = self.add_scissor() as u32;
-        
+
         prim.xform = self.add_xform() as u32;
         self.render(prim);
     }
@@ -531,7 +531,7 @@ impl Vger {
         ];
         prim.tex_bounds = prim.quad_bounds;
         prim.scissor = self.add_scissor() as u32;
-        
+
         prim.xform = self.add_xform() as u32;
         self.render(prim);
     }
@@ -557,7 +557,7 @@ impl Vger {
         prim.quad_bounds = [min.x - width, min.y - width, max.x + width, max.y + width];
         prim.tex_bounds = prim.quad_bounds;
         prim.scissor = self.add_scissor() as u32;
-        
+
         prim.xform = self.add_xform() as u32;
         self.render(prim);
     }
@@ -588,7 +588,7 @@ impl Vger {
         ];
         prim.tex_bounds = prim.quad_bounds;
         prim.scissor = self.add_scissor() as u32;
-        
+
         prim.xform = self.add_xform() as u32;
         self.render(prim);
     }
@@ -623,7 +623,7 @@ impl Vger {
         ];
         prim.tex_bounds = prim.quad_bounds;
         prim.scissor = self.add_scissor() as u32;
-        
+
         prim.xform = self.add_xform() as u32;
         self.render(prim);
     }
@@ -722,7 +722,7 @@ impl Vger {
             ];
             prim.paint = paint_index.index as u32;
             prim.scissor = self.add_scissor() as u32;
-            
+
             prim.xform = self.add_xform() as u32;
             self.render(prim);
         }
@@ -753,7 +753,7 @@ impl Vger {
                 (rect.y + rect.height) as f32,
             ];
             prim.scissor = self.add_scissor() as u32;
-            
+
             prim.xform = self.add_xform() as u32;
             self.render(prim);
         }
@@ -792,7 +792,7 @@ impl Vger {
                 prim.paint = paint_index.index as u32;
             }
             prim.scissor = self.add_scissor() as u32;
-            
+
             prim.xform = self.add_xform() as u32;
             self.render(prim);
         }
