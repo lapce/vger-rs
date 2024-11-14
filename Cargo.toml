@@ -4,7 +4,7 @@ resolver = "2" # What does this do?
 [package]
 name = "floem-vger"
 description = "Unofficial vger fork for Floem"
-version = "0.3.0"
+version = "0.3.1"
 license = "MIT"
 readme = "README.md"
 authors = ["Taylor Holliday <taylor@audulus.com>"]
