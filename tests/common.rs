@@ -6,7 +6,7 @@ use wgpu::StoreOp;
 pub async fn setup() -> (wgpu::Device, wgpu::Queue) {
     let instance_desc = wgpu::InstanceDescriptor::default();
 
-    let instance = wgpu::Instance::new(instance_desc);
+    let instance = wgpu::Instance::new(&instance_desc);
 
     let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, None)
         .await
@@ -108,9 +108,9 @@ fn get_texture_data(
         // Copy the data from the texture to the buffer
         encoder.copy_texture_to_buffer(
             texture.as_image_copy(),
-            wgpu::ImageCopyBuffer {
+            wgpu::TexelCopyBufferInfo {
                 buffer: &output_buffer,
-                layout: wgpu::ImageDataLayout {
+                layout: wgpu::TexelCopyBufferLayout {
                     offset: 0,
                     bytes_per_row: Some(texture_extent.width * bytes_per_pixel),
                     rows_per_image: None,
