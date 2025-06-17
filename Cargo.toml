@@ -15,10 +15,10 @@ edition = "2018"
 
 [dependencies]
 wgpu = "24.0.5"
-euclid = "0.22"
-fontdue = "0.9"
-rect_packer = "0.2"
-cosmic-text = "0.14"
+euclid = "0.22.11"
+fontdue = "0.9.3"
+rect_packer = "0.2.1"
+cosmic-text = "0.14.2"
 
 [dev-dependencies]
 png = "0.17.16"
