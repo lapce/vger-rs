@@ -133,7 +133,9 @@ pub fn render_test(
     capture: bool,
 ) {
     if capture {
-        unsafe { device.start_graphics_debugger_capture(); }
+        unsafe {
+            device.start_graphics_debugger_capture();
+        }
     }
 
     let texture_size = wgpu::Extent3d {
