@@ -657,8 +657,8 @@ impl Vger {
             prim.start = self.scenes[self.cur_scene].cvs.len() as u32;
 
             let mut x_interval = Interval {
-                a: std::f32::MAX,
-                b: std::f32::MIN,
+                a: f32::MAX,
+                b: f32::MIN,
             };
 
             let mut index = self.path_scanner.first;
@@ -686,6 +686,7 @@ impl Vger {
         self.path_scanner.segments.clear();
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn render_glyph(
         &mut self,
         x: f32,
@@ -755,6 +756,7 @@ impl Vger {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn render_svg(
         &mut self,
         x: f32,
@@ -992,19 +994,14 @@ impl Vger {
     }
 }
 
-#[derive(Hash, Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Hash, Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 #[repr(u8)]
 pub enum SubpixelOffset {
+    #[default]
     Zero = 0,
     Quarter = 1,
     Half = 2,
     ThreeQuarters = 3,
-}
-
-impl Default for SubpixelOffset {
-    fn default() -> Self {
-        SubpixelOffset::Zero
-    }
 }
 
 impl SubpixelOffset {
