@@ -78,7 +78,7 @@ impl<T: Copy> GPUVec<T> {
         }
     }
 
-    pub fn bind_group_entry(&self, binding: u32) -> wgpu::BindGroupEntry {
+    pub fn bind_group_entry(&'_ self, binding: u32) -> wgpu::BindGroupEntry<'_> {
         wgpu::BindGroupEntry {
             binding,
             resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {

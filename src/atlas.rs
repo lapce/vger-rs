@@ -183,8 +183,7 @@ impl Atlas {
             let width = data.rect.width * pixels;
             let padding = (align - width % align) % align;
             let padded_width = width + padding;
-            let mut padded_data = vec![];
-            padded_data.reserve((padded_width * data.rect.height) as usize);
+            let mut padded_data = Vec::with_capacity((padded_width * data.rect.height) as usize);
 
             let mut i = 0;
             for _ in 0..data.rect.height {
