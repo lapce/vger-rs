@@ -1,4 +1,5 @@
 use futures::executor::block_on;
+use rand::RngExt;
 use vger::color::Color;
 use vger::defs::*;
 use vger::*;
@@ -219,7 +220,7 @@ fn bezier_stroke_gradient() {
 }
 
 fn rand2<T: rand::Rng>(rng: &mut T) -> LocalPoint {
-    LocalPoint::new(rng.gen_range(0.0, 512.0), rng.gen_range(0.0, 512.0))
+    LocalPoint::new(rng.random_range(0.0..512.0), rng.random_range(0.0..512.0))
 }
 
 #[test]
@@ -232,7 +233,7 @@ fn path_fill() {
 
     let paint = vger.linear_gradient([0.0, 0.0], [512.0, 512.0], Color::CYAN, Color::MAGENTA, 0.0);
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     let start = rand2(&mut rng);
 

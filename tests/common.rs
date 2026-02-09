@@ -6,7 +6,7 @@ use wgpu::StoreOp;
 pub async fn setup() -> (wgpu::Device, wgpu::Queue) {
     let instance_desc = wgpu::InstanceDescriptor::default();
 
-    let instance = wgpu::Instance::new(instance_desc);
+    let instance = wgpu::Instance::new(&instance_desc);
 
     let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, None)
         .await
@@ -15,12 +15,9 @@ pub async fn setup() -> (wgpu::Device, wgpu::Queue) {
     let adapter_info = adapter.get_info();
     println!("Using {} ({:?})", adapter_info.name, adapter_info.backend);
 
-    let trace_dir = std::env::var("WGPU_TRACE");
+    let _trace_dir = std::env::var("WGPU_TRACE");
     adapter
-        .request_device(
-            &wgpu::DeviceDescriptor::default(),
-            trace_dir.ok().as_ref().map(std::path::Path::new),
-        )
+        .request_device(&wgpu::DeviceDescriptor::default())
         .await
         .expect("Unable to find a suitable GPU adapter!")
 }
@@ -45,7 +42,7 @@ pub async fn create_png(
     // Poll the device in a blocking manner so that our future resolves.
     // In an actual application, `device.poll(...)` should
     // be called in an event loop or on another thread.
-    device.poll(wgpu::Maintain::Wait);
+    device.poll(wgpu::PollType::Wait).unwrap();
     // If a file system is available, write the buffer as a PNG
     let has_file_system_available = cfg!(not(target_arch = "wasm32"));
     if !has_file_system_available {
@@ -108,9 +105,9 @@ fn get_texture_data(
         // Copy the data from the texture to the buffer
         encoder.copy_texture_to_buffer(
             texture.as_image_copy(),
-            wgpu::ImageCopyBuffer {
+            wgpu::TexelCopyBufferInfo {
                 buffer: &output_buffer,
-                layout: wgpu::ImageDataLayout {
+                layout: wgpu::TexelCopyBufferLayout {
                     offset: 0,
                     bytes_per_row: Some(texture_extent.width * bytes_per_pixel),
                     rows_per_image: None,
@@ -124,7 +121,7 @@ fn get_texture_data(
 
     queue.submit(Some(command_buffer));
 
-    device.poll(wgpu::Maintain::Wait);
+    device.poll(wgpu::PollType::Wait).unwrap();
 
     output_buffer
 }
@@ -137,7 +134,7 @@ pub fn render_test(
     capture: bool,
 ) {
     if capture {
-        device.start_capture();
+        unsafe { device.start_graphics_debugger_capture() }
     }
 
     let texture_size = wgpu::Extent3d {
@@ -170,6 +167,7 @@ pub fn render_test(
                 load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                 store: StoreOp::Store,
             },
+            depth_slice: None
         })],
         depth_stencil_attachment: None,
         occlusion_query_set: None,
@@ -181,7 +179,7 @@ pub fn render_test(
     let output_buffer = get_texture_data(&texture_desc, device, queue, &render_texture);
 
     if capture {
-        device.stop_capture();
+        unsafe { device.stop_graphics_debugger_capture() }
     }
 
     block_on(create_png(name, device, output_buffer, &texture_desc));

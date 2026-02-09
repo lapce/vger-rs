@@ -39,6 +39,7 @@ impl GlyphCache {
         let settings = fontdue::FontSettings {
             collection_index: 0,
             scale: 100.0,
+            load_substitutions: true // default
         };
         let font = include_bytes!("fonts/Anodina-Regular.ttf") as &[u8];
 
