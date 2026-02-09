@@ -11,7 +11,7 @@ authors = ["Taylor Holliday <taylor@audulus.com>"]
 keywords = ["graphics", "canvas", "vector", "drawing", "gpu"]
 categories = ["graphics"]
 repository = "https://github.com/audulus/vger-rs"
-edition = "2018"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
