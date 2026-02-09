@@ -167,7 +167,7 @@ pub fn render_test(
                 load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
                 store: StoreOp::Store,
             },
-            depth_slice: None
+            depth_slice: None,
         })],
         depth_stencil_attachment: None,
         occlusion_query_set: None,
