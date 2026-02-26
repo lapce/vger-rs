@@ -33,6 +33,18 @@ pub struct GlyphImage {
     pub colored: bool,
 }
 
+pub enum PixelFormat {
+    //TODO: add Rgb(currently we assume Rgba everywhere)
+    Rgba,
+}
+
+pub struct Image {
+    pub width: u32,
+    pub height: u32,
+    pub data: Vec<u8>,
+    pub pixel_format: PixelFormat,
+}
+
 pub struct GlyphCache {
     pub size: u32,
     pub mask_atlas: Atlas,
