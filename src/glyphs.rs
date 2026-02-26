@@ -33,10 +33,6 @@ pub struct GlyphImage {
     pub colored: bool,
 }
 
-pub enum PixelFormat {
-    //TODO: add Rgb(currently we assume Rgba everywhere)
-    Rgba,
-}
 
 pub struct Image {
     pub width: u32,
