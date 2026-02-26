@@ -1,7 +1,7 @@
 [package]
 name = "floem-vger"
 description = "Unofficial vger fork for Floem"
-version = "0.3.1"
+version = "0.3.2"
 license = "MIT"
 readme = "README.md"
 authors = ["Taylor Holliday <taylor@audulus.com>"]
