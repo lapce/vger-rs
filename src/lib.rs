@@ -26,7 +26,7 @@ pub mod atlas;
 mod glyphs;
 
 use glyphs::GlyphCache;
-pub use glyphs::{GlyphImage, Image, PixelFormat};
+pub use glyphs::{Image, PixelFormat, SwashImage};
 
 use wgpu::util::DeviceExt;
 
@@ -692,7 +692,7 @@ impl Vger {
         glyph_id: u16,
         size: u32,
         subpx: (u8, u8),
-        image: impl FnOnce() -> GlyphImage,
+        image: impl FnOnce() -> SwashImage,
         paint_index: PaintIndex,
     ) {
         let info = self

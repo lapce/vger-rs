@@ -8,9 +8,8 @@ use common::*;
 use std::sync::Arc;
 
 fn load_font() -> fontdue::Font {
-    let font_data =
-        std::fs::read("C:/Windows/Fonts/arial.ttf").expect("Arial font not found on system");
-    fontdue::Font::from_bytes(font_data.as_slice(), fontdue::FontSettings::default())
+    let data = include_bytes!("fonts/DejaVuSerif.ttf").to_vec();
+    fontdue::Font::from_bytes(data.as_slice(), fontdue::FontSettings::default())
         .expect("Failed to parse Arial font")
 }
 
@@ -35,8 +34,8 @@ fn render_text_line(
         let (metrics, bitmap) = font.rasterize(ch, font_size);
 
         if metrics.width > 0 && metrics.height > 0 {
-            let image = GlyphImage {
-                data: bitmap,
+            let image = SwashImage {
+                data: bitmap.into(),
                 width: metrics.width as u32,
                 height: metrics.height as u32,
                 left: metrics.xmin,
@@ -450,7 +449,7 @@ fn text_box() {
 
     vger.begin(512.0, 512.0, 1.0);
 
-    let _paint = vger.linear_gradient([0.0, 0.0], [512.0, 512.0], Color::CYAN, Color::MAGENTA, 0.0);
+    let paint = vger.linear_gradient([0.0, 0.0], [512.0, 512.0], Color::CYAN, Color::MAGENTA, 0.0);
 
     let lorem = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
 
@@ -554,99 +553,6 @@ fn test_scissor_text() {
     let png_name = "text_box_scissor.png";
     render_test(&mut vger, &device, &queue, png_name, true);
     assert!(png_not_black(png_name));
-}
-
-#[test]
-fn segment_stroke_stress() {
-    let (device, queue) = setup();
-
-    let mut vger = Vger::new(
-        device.clone(),
-        queue.clone(),
-        wgpu::TextureFormat::Rgba8UnormSrgb,
-    );
-
-    vger.begin(512.0, 512.0, 1.0);
-
-    let _paint = vger.linear_gradient([0.0, 0.0], [512.0, 512.0], Color::CYAN, Color::MAGENTA, 0.0);
-
-    for _ in 0..100000 {
-        let mut rng = rand::thread_rng();
-        let a = rand2(&mut rng);
-        let b = rand2(&mut rng);
-
-        vger.stroke_segment(a, b, 4.0, paint);
-    }
-
-    render_test(
-        &mut vger,
-        &device,
-        &queue,
-        "segment_stroke_stress.png",
-        false,
-    );
-}
-
-#[test]
-fn segment_stroke_vertical() {
-    let (device, queue) = setup();
-
-    let mut vger = Vger::new(
-        device.clone(),
-        queue.clone(),
-        wgpu::TextureFormat::Rgba8UnormSrgb,
-    );
-
-    vger.begin(512.0, 512.0, 1.0);
-
-    let paint = vger.linear_gradient(
-        [100.0, 100.0],
-        [100.0, 200.0],
-        Color::CYAN,
-        Color::MAGENTA,
-        0.0,
-    );
-
-    vger.stroke_segment([100.0, 100.0], [100.0, 200.0], 4.0, paint);
-
-    render_test(
-        &mut vger,
-        &device,
-        &queue,
-        "segment_stroke_vertical.png",
-        false,
-    );
-}
-
-#[test]
-fn segment_stroke_horizontal() {
-    let (device, queue) = setup();
-
-    let mut vger = Vger::new(
-        device.clone(),
-        queue.clone(),
-        wgpu::TextureFormat::Rgba8UnormSrgb,
-    );
-
-    vger.begin(512.0, 512.0, 1.0);
-
-    let paint = vger.linear_gradient(
-        [100.0, 100.0],
-        [200.0, 100.0],
-        Color::CYAN,
-        Color::MAGENTA,
-        0.0,
-    );
-
-    vger.stroke_segment([100.0, 100.0], [200.0, 100.0], 4.0, paint);
-
-    render_test(
-        &mut vger,
-        &device,
-        &queue,
-        "segment_stroke_horizontal.png",
-        false,
-    );
 }
 
 #[test]

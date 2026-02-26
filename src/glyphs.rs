@@ -1,4 +1,5 @@
 use crate::atlas::{Atlas, AtlasContent};
+use linebender_resource_handle::Blob;
 use rect_packer::Rect;
 use std::collections::HashMap;
 
@@ -18,27 +19,19 @@ pub enum PixelFormat {
 pub struct Image {
     pub width: u32,
     pub height: u32,
-    pub data: Vec<u8>,
+    pub data: Blob<u8>,
     pub pixel_format: PixelFormat,
 }
 
 /// Rasterized glyph image data (replaces cosmic_text::SwashImage).
-pub struct GlyphImage {
-    pub data: Vec<u8>,
+pub struct SwashImage {
+    pub data: Blob<u8>,
     pub width: u32,
     pub height: u32,
     pub left: i32,
     pub top: i32,
     /// true = color glyph (goes in color atlas), false = mask glyph (goes in mask atlas)
     pub colored: bool,
-}
-
-
-pub struct Image {
-    pub width: u32,
-    pub height: u32,
-    pub data: Vec<u8>,
-    pub pixel_format: PixelFormat,
 }
 
 pub struct GlyphCache {
@@ -79,7 +72,7 @@ impl GlyphCache {
         let image = image_fn();
         let rect = self
             .color_atlas
-            .add_region(&image.data, image.width, image.height);
+            .add_region(image.data.data(), image.width, image.height);
         let info = AtlasInfo {
             rect,
             left: 0,
@@ -130,7 +123,7 @@ impl GlyphCache {
         glyph_id: u16,
         size: u32,
         subpx: (u8, u8),
-        image: impl FnOnce() -> GlyphImage,
+        image: impl FnOnce() -> SwashImage,
     ) -> AtlasInfo {
         let key = (font_id, glyph_id, size, subpx);
         if let Some(rect) = self.glyph_infos.get(&key) {
@@ -140,10 +133,10 @@ impl GlyphCache {
         let image = image();
         let rect = if image.colored {
             self.color_atlas
-                .add_region(&image.data, image.width, image.height)
+                .add_region(image.data.data(), image.width, image.height)
         } else {
             self.mask_atlas
-                .add_region(&image.data, image.width, image.height)
+                .add_region(image.data.data(), image.width, image.height)
         };
         let info = AtlasInfo {
             rect,
