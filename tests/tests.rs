@@ -34,7 +34,7 @@ fn render_text_line(
         let (metrics, bitmap) = font.rasterize(ch, font_size);
 
         if metrics.width > 0 && metrics.height > 0 {
-            let image = SwashImage {
+            let image = GlyphImage {
                 data: bitmap.into(),
                 width: metrics.width as u32,
                 height: metrics.height as u32,

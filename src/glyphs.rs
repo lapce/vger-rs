@@ -24,7 +24,7 @@ pub struct Image {
 }
 
 /// Rasterized glyph image data (replaces cosmic_text::SwashImage).
-pub struct SwashImage {
+pub struct GlyphImage {
     pub data: Blob<u8>,
     pub width: u32,
     pub height: u32,
@@ -123,7 +123,7 @@ impl GlyphCache {
         glyph_id: u16,
         size: u32,
         subpx: (u8, u8),
-        image: impl FnOnce() -> SwashImage,
+        image: impl FnOnce() -> GlyphImage,
     ) -> AtlasInfo {
         let key = (font_id, glyph_id, size, subpx);
         if let Some(rect) = self.glyph_infos.get(&key) {
