@@ -301,7 +301,7 @@ impl Vger {
         let mask_texture_view = glyph_cache.mask_atlas.create_view();
         let color_texture_view = glyph_cache.color_atlas.create_view();
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -314,9 +314,7 @@ impl Vger {
                 },
             ],
             label: Some("vger cache bind group"),
-        });
-
-        bind_group
+        })
     }
 
     /// Begin rendering.

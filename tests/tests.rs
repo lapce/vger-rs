@@ -44,7 +44,16 @@ fn render_text_line(
                 colored: false,
             };
 
-            vger.render_glyph(cursor_x.floor(), y.floor(), 0, glyph_id, size, (0, 0), || image, paint);
+            vger.render_glyph(
+                cursor_x.floor(),
+                y.floor(),
+                0,
+                glyph_id,
+                size,
+                (0, 0),
+                || image,
+                paint,
+            );
         }
 
         cursor_x += metrics.advance_width;
@@ -375,7 +384,15 @@ fn text_small() {
 
     let font = load_font();
     let paint = vger.color_paint(Color::WHITE);
-    render_text_line(&mut vger, &font, "Small text at 12px", 12.0, 32.0, 256.0, paint);
+    render_text_line(
+        &mut vger,
+        &font,
+        "Small text at 12px",
+        12.0,
+        32.0,
+        256.0,
+        paint,
+    );
 
     let png_name = "text_small.png";
     render_test(&mut vger, &device, &queue, png_name, true);
@@ -459,7 +476,15 @@ fn text_box() {
             cursor_y += line_height;
         }
 
-        render_text_line(&mut vger, &font, word, font_size, start_x + cursor_x, start_y + cursor_y, paint);
+        render_text_line(
+            &mut vger,
+            &font,
+            word,
+            font_size,
+            start_x + cursor_x,
+            start_y + cursor_y,
+            paint,
+        );
 
         cursor_x += word_width;
     }
@@ -516,7 +541,15 @@ fn test_scissor_text() {
     let font = load_font();
     // Scissor clips rendering to a region; text at (32, 256) should be partially visible.
     vger.scissor(euclid::rect(0.0, 230.0, 300.0, 50.0), 0.0);
-    render_text_line(&mut vger, &font, "Clipped text in a scissor rect", 24.0, 32.0, 256.0, paint);
+    render_text_line(
+        &mut vger,
+        &font,
+        "Clipped text in a scissor rect",
+        24.0,
+        32.0,
+        256.0,
+        paint,
+    );
 
     let png_name = "text_box_scissor.png";
     render_test(&mut vger, &device, &queue, png_name, true);
