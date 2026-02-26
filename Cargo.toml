@@ -1,31 +1,25 @@
-[workspace]
-resolver = "2" # What does this do?
-
 [package]
-name = "vger"
-description = "2D GPU renderer for dynamic UIs"
-version = "0.2.5"
+name = "floem-vger"
+description = "Unofficial vger fork for Floem"
+version = "0.3.1"
 license = "MIT"
 readme = "README.md"
 authors = ["Taylor Holliday <taylor@audulus.com>"]
-keywords = ["graphics", "canvas", "vector", "drawing", "gpu"]
-categories = ["graphics"]
 repository = "https://github.com/audulus/vger-rs"
 edition = "2024"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-wgpu = "26.0"
+wgpu = "27"
 euclid = "0.22"
 fontdue = "0.9"
-rect_packer = "0.2.1"
-rand = "0.10"
-# cosmic-text = { git = "https://github.com/lapce/cosmic-text", rev = "25f260eced296296ca22d22a04cbb3026f5fe2a2" }
-cosmic-text = { version = "0.17.1", features = ["shape-run-cache"] }
-# cosmic-text = { path = "../cosmic-text" }
+rect_packer = "0.2"
+
 
 [dev-dependencies]
-png = "0.17.6"
+png = "0.17"
 futures = "0.3"
 futures-intrusive = "0.5"
+svg = "0.13"
+rand = "0.8"
+fontdue = "0.9"

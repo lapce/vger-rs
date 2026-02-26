@@ -1,6 +1,6 @@
+use floem_vger::*;
 use futures::executor::block_on;
 use std::fs::File;
-use vger::*;
 use wgpu::StoreOp;
 
 pub async fn setup() -> (wgpu::Device, wgpu::Queue) {
@@ -15,7 +15,6 @@ pub async fn setup() -> (wgpu::Device, wgpu::Queue) {
     let adapter_info = adapter.get_info();
     println!("Using {} ({:?})", adapter_info.name, adapter_info.backend);
 
-    let _trace_dir = std::env::var("WGPU_TRACE");
     adapter
         .request_device(&wgpu::DeviceDescriptor::default())
         .await
@@ -42,7 +41,7 @@ pub async fn create_png(
     // Poll the device in a blocking manner so that our future resolves.
     // In an actual application, `device.poll(...)` should
     // be called in an event loop or on another thread.
-    device.poll(wgpu::PollType::Wait).unwrap();
+    device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
     // If a file system is available, write the buffer as a PNG
     let has_file_system_available = cfg!(not(target_arch = "wasm32"));
     if !has_file_system_available {
@@ -121,7 +120,7 @@ fn get_texture_data(
 
     queue.submit(Some(command_buffer));
 
-    device.poll(wgpu::PollType::Wait).unwrap();
+    device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
 
     output_buffer
 }
@@ -134,7 +133,9 @@ pub fn render_test(
     capture: bool,
 ) {
     if capture {
-        unsafe { device.start_graphics_debugger_capture() }
+        unsafe {
+            device.start_graphics_debugger_capture();
+        }
     }
 
     let texture_size = wgpu::Extent3d {
@@ -170,16 +171,18 @@ pub fn render_test(
             depth_slice: None,
         })],
         depth_stencil_attachment: None,
-        occlusion_query_set: None,
         timestamp_writes: None,
+        occlusion_query_set: None,
     };
 
-    vger.encode(device, &desc, queue);
+    vger.encode(&desc);
 
     let output_buffer = get_texture_data(&texture_desc, device, queue, &render_texture);
 
     if capture {
-        unsafe { device.stop_graphics_debugger_capture() }
+        unsafe {
+            device.stop_graphics_debugger_capture();
+        }
     }
 
     block_on(create_png(name, device, output_buffer, &texture_desc));

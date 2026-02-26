@@ -1,4 +1,5 @@
 use std::mem::size_of;
+use std::ops::Index;
 use wgpu::*;
 
 pub struct GPUVec<T: Copy> {
@@ -45,14 +46,10 @@ impl<T: Copy> GPUVec<T> {
     ///
     /// We'd like to write directly to the mapped buffer, but that seemed
     /// tricky with wgpu.
-    pub fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) {
-        let mut realloc = false;
-        while self.data.len() > self.capacity {
-            self.capacity *= 2;
-            realloc = true;
-        }
-
+    pub fn update(&mut self, device: &wgpu::Device, queue: &wgpu::Queue) -> bool {
+        let realloc = self.data.len() > self.capacity;
         if realloc {
+            self.capacity = self.data.len().next_power_of_two();
             self.buffer = device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some(self.label.as_str()),
                 size: (size_of::<T>() * self.capacity) as u64,
@@ -64,7 +61,8 @@ impl<T: Copy> GPUVec<T> {
         let sz = self.data.len() * size_of::<T>();
         queue.write_buffer(&self.buffer, 0, unsafe {
             std::slice::from_raw_parts_mut(self.data[..].as_ptr() as *mut u8, sz)
-        })
+        });
+        realloc
     }
 
     pub fn bind_group_layout_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
@@ -80,7 +78,7 @@ impl<T: Copy> GPUVec<T> {
         }
     }
 
-    pub fn bind_group_entry(&self, binding: u32) -> wgpu::BindGroupEntry<'_> {
+    pub fn bind_group_entry(&'_ self, binding: u32) -> wgpu::BindGroupEntry<'_> {
         wgpu::BindGroupEntry {
             binding,
             resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
@@ -105,5 +103,13 @@ impl<T: Copy> GPUVec<T> {
 
     pub fn len(&self) -> usize {
         self.data.len()
+    }
+}
+
+impl<T: Copy> Index<usize> for GPUVec<T> {
+    type Output = T;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.data[index]
     }
 }

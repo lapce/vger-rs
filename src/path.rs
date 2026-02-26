@@ -60,17 +60,17 @@ impl PathScanner {
 
     pub fn init(&mut self) {
         // Close the path if necessary.
-        if let Some(first) = self.segments.first()
-            && let Some(last) = self.segments.last()
-        {
-            let start = first.cvs[0];
-            let end = last.cvs[2];
-            if start != end {
-                self.segments.push(PathSegment {
-                    cvs: [end, start.lerp(end, 0.5), start],
-                    next: None,
-                    previous: None,
-                })
+        if let Some(first) = self.segments.first() {
+            if let Some(last) = self.segments.last() {
+                let start = first.cvs[0];
+                let end = last.cvs[2];
+                if start != end {
+                    self.segments.push(PathSegment {
+                        cvs: [end, start.lerp(end, 0.5), start],
+                        next: None,
+                        previous: None,
+                    })
+                }
             }
         }
 

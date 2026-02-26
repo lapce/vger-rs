@@ -1,5 +1,4 @@
-use cosmic_text::{SubpixelBin, SwashImage};
-use fontdue::layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle};
+use std::sync::Arc;
 
 mod path;
 use path::*;
@@ -25,16 +24,26 @@ pub use color::Color;
 pub mod atlas;
 
 mod glyphs;
+
 use glyphs::GlyphCache;
+pub use glyphs::{GlyphImage, Image, PixelFormat};
+
+use wgpu::util::DeviceExt;
 
 #[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]
 struct Uniforms {
     size: [f32; 2],
+    atlas_size: [f32; 2],
 }
 
 #[derive(Copy, Clone, Debug)]
 pub struct PaintIndex {
+    index: usize,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct ImageIndex {
     index: usize,
 }
 
@@ -51,6 +60,8 @@ pub(crate) struct Scissor {
     pub xform: WorldToLocal,
     pub origin: [f32; 2],
     pub size: [f32; 2],
+    pub radius: f32,
+    pad: f32,
 }
 
 impl Scissor {
@@ -59,11 +70,15 @@ impl Scissor {
             xform: WorldToLocal::identity(),
             origin: [-10000.0, -10000.0],
             size: [20000.0, 20000.0],
+            radius: 0.0,
+            pad: 0.0,
         }
     }
 }
 
 pub struct Vger {
+    device: Arc<wgpu::Device>,
+    queue: Arc<wgpu::Queue>,
     scenes: [Scene; 3],
     cur_scene: usize,
     cur_layer: usize,
@@ -81,12 +96,19 @@ pub struct Vger {
     path_scanner: PathScanner,
     pen: LocalPoint,
     pub glyph_cache: GlyphCache,
-    layout: Layout,
+    images: Vec<Option<wgpu::Texture>>,
+    image_bind_groups: Vec<Option<wgpu::BindGroup>>,
+    cache_bind_group_layout: wgpu::BindGroupLayout,
+    cache_bind_group: wgpu::BindGroup,
 }
 
 impl Vger {
     /// Create a new renderer given a device and output pixel format.
-    pub fn new(device: &wgpu::Device, texture_format: wgpu::TextureFormat) -> Self {
+    pub fn new(
+        device: Arc<wgpu::Device>,
+        queue: Arc<wgpu::Queue>,
+        texture_format: wgpu::TextureFormat,
+    ) -> Self {
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
             source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(include_str!(
@@ -94,7 +116,11 @@ impl Vger {
             ))),
         });
 
-        let scenes = [Scene::new(device), Scene::new(device), Scene::new(device)];
+        let scenes = [
+            Scene::new(&device),
+            Scene::new(&device),
+            Scene::new(&device),
+        ];
 
         let uniform_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -112,31 +138,11 @@ impl Vger {
                     wgpu::BindGroupLayoutEntry {
                         binding: 1,
                         visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            multisampled: false,
-                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 3,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
                     wgpu::BindGroupLayoutEntry {
-                        binding: 4,
+                        binding: 2,
                         visibility: wgpu::ShaderStages::FRAGMENT,
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
@@ -145,12 +151,36 @@ impl Vger {
                 label: Some("uniform_bind_group_layout"),
             });
 
-        let glyph_cache = GlyphCache::new(device);
+        let cache_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                        },
+                        count: None,
+                    },
+                ],
+                label: Some("image_bind_group_layout"),
+            });
 
-        let mask_texture_view = glyph_cache.mask_atlas.create_view();
-        let color_texture_view = glyph_cache.color_atlas.create_view();
+        let glyph_cache = GlyphCache::new(&device);
 
-        let uniforms = GPUVec::new_uniforms(device, "uniforms");
+        let uniforms = GPUVec::new_uniforms(&device, "uniforms");
 
         let glyph_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("glyph"),
@@ -174,29 +204,25 @@ impl Vger {
                 uniforms.bind_group_entry(0),
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&mask_texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&color_texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
                     resource: wgpu::BindingResource::Sampler(&glyph_sampler),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 4,
+                    binding: 2,
                     resource: wgpu::BindingResource::Sampler(&color_glyph_sampler),
                 },
             ],
             label: Some("vger bind group"),
         });
 
+        let cache_bind_group =
+            Self::get_cache_bind_group(&device, &glyph_cache, &cache_bind_group_layout);
+
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
             bind_group_layouts: &[
-                &Scene::bind_group_layout(device),
+                &Scene::bind_group_layout(&device),
                 &uniform_bind_group_layout,
+                &cache_bind_group_layout,
             ],
             push_constant_ranges: &[],
         });
@@ -240,9 +266,9 @@ impl Vger {
             cache: None,
         });
 
-        let layout = Layout::new(CoordinateSystem::PositiveYUp);
-
         Self {
+            device,
+            queue,
             scenes,
             cur_scene: 0,
             cur_layer: 0,
@@ -260,8 +286,37 @@ impl Vger {
             path_scanner: PathScanner::new(),
             pen: LocalPoint::zero(),
             glyph_cache,
-            layout,
+            images: vec![],
+            image_bind_groups: vec![],
+            cache_bind_group_layout,
+            cache_bind_group,
         }
+    }
+
+    fn get_cache_bind_group(
+        device: &wgpu::Device,
+        glyph_cache: &GlyphCache,
+        bind_group_layout: &wgpu::BindGroupLayout,
+    ) -> wgpu::BindGroup {
+        let mask_texture_view = glyph_cache.mask_atlas.create_view();
+        let color_texture_view = glyph_cache.color_atlas.create_view();
+
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: bind_group_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&mask_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::TextureView(&color_texture_view),
+                },
+            ],
+            label: Some("vger cache bind group"),
+        });
+
+        bind_group
     }
 
     /// Begin rendering.
@@ -269,10 +324,6 @@ impl Vger {
         self.device_px_ratio = device_px_ratio;
         self.cur_layer = 0;
         self.screen_size = ScreenSize::new(window_width, window_height);
-        self.uniforms.clear();
-        self.uniforms.push(Uniforms {
-            size: [window_width, window_height],
-        });
         self.cur_scene = (self.cur_scene + 1) % 3;
         self.scenes[self.cur_scene].clear();
         self.tx_stack.clear();
@@ -284,6 +335,22 @@ impl Vger {
         self.add_xform();
         self.scissor_count = 0;
         self.pen = LocalPoint::zero();
+
+        // If we're getting close to full, reset the glyph cache.
+        if self.glyph_cache.check_usage(&self.device) {
+            // if resized, we need to get new bind group
+            self.cache_bind_group = Self::get_cache_bind_group(
+                &self.device,
+                &self.glyph_cache,
+                &self.cache_bind_group_layout,
+            )
+        }
+
+        self.uniforms.clear();
+        self.uniforms.push(Uniforms {
+            size: [window_width, window_height],
+            atlas_size: [self.glyph_cache.size as f32, self.glyph_cache.size as f32],
+        });
     }
 
     /// Saves rendering state (transform and scissor rect).
@@ -299,14 +366,12 @@ impl Vger {
     }
 
     /// Encode all rendering to a command buffer.
-    pub fn encode(
-        &mut self,
-        device: &wgpu::Device,
-        render_pass: &wgpu::RenderPassDescriptor,
-        queue: &wgpu::Queue,
-    ) {
+    pub fn encode(&mut self, render_pass: &wgpu::RenderPassDescriptor) {
+        let device = &self.device;
+        let queue = &self.queue;
         self.scenes[self.cur_scene].update(device, queue);
         self.uniforms.update(device, queue);
+        let mut current_texture = -1;
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("vger encoder"),
@@ -326,16 +391,51 @@ impl Vger {
             );
 
             rpass.set_bind_group(1, &self.uniform_bind_group, &[]);
+            rpass.set_bind_group(2, &self.cache_bind_group, &[]);
 
-            let n = self.scenes[self.cur_scene].prims[self.cur_layer].len();
-            // println!("encoding {:?} prims", n);
+            let scene = &self.scenes[self.cur_scene];
+            let n = scene.prims[self.cur_layer].len();
+            let mut m: u32 = 0;
+            let mut start: u32 = 0;
 
-            rpass.draw(/*vertices*/ 0..4, /*instances*/ 0..(n as u32))
+            for i in 0..n {
+                let prim = &scene.prims[self.cur_layer][i];
+                let image_id = scene.paints[prim.paint as usize].image;
+
+                // Image changed, render.
+                if image_id >= 0 && image_id != current_texture {
+                    // println!("image changed: encoding {:?} prims", m);
+                    if m > 0 {
+                        rpass.draw(
+                            /*vertices*/ 0..4,
+                            /*instances*/ start..(start + m),
+                        );
+                    }
+
+                    current_texture = image_id;
+                    rpass.set_bind_group(
+                        2,
+                        self.image_bind_groups[image_id as usize].as_ref().unwrap(),
+                        &[],
+                    );
+
+                    start += m;
+                    m = 0;
+                }
+
+                m += 1;
+            }
+
+            // println!("encoding {:?} prims", m);
+
+            if m > 0 {
+                rpass.draw(
+                    /*vertices*/ 0..4,
+                    /*instances*/ start..(start + m),
+                )
+            }
         }
         queue.submit(Some(encoder.finish()));
-
-        // If we're getting close to full, reset the glyph cache.
-        self.glyph_cache.check_usage();
     }
 
     fn render(&mut self, prim: Prim) {
@@ -409,6 +509,7 @@ impl Vger {
         rect: Rect,
         radius: f32,
         paint_index: PaintIndex,
+        blur_radius: f32,
     ) {
         let mut prim = Prim::default();
         prim.prim_type = PrimType::Rect as u32;
@@ -419,9 +520,15 @@ impl Vger {
         prim.cvs[1] = min.y;
         prim.cvs[2] = max.x;
         prim.cvs[3] = max.y;
+        prim.cvs[4] = blur_radius;
         prim.radius = radius;
         prim.paint = paint_index.index as u32;
-        prim.quad_bounds = [min.x, min.y, max.x, max.y];
+        prim.quad_bounds = [
+            min.x - blur_radius * 3.0,
+            min.y - blur_radius * 3.0,
+            max.x + blur_radius * 3.0,
+            max.y + blur_radius * 3.0,
+        ];
         prim.tex_bounds = prim.quad_bounds;
         prim.scissor = self.add_scissor() as u32;
 
@@ -578,32 +685,16 @@ impl Vger {
         self.path_scanner.segments.clear();
     }
 
-    fn setup_layout(&mut self, text: &str, size: u32, max_width: Option<f32>) {
-        let scale = self.device_px_ratio;
-
-        self.layout.reset(&LayoutSettings {
-            max_width: max_width.map(|w| w * scale),
-            ..LayoutSettings::default()
-        });
-
-        let scaled_size = size as f32 * scale;
-
-        self.layout.append(
-            &[&self.glyph_cache.font],
-            &TextStyle::new(text, scaled_size, 0),
-        );
-    }
-
     #[allow(clippy::too_many_arguments)]
     pub fn render_glyph(
         &mut self,
         x: f32,
         y: f32,
-        font_id: cosmic_text::fontdb::ID,
+        font_id: u64,
         glyph_id: u16,
         size: u32,
-        subpx: (SubpixelBin, SubpixelBin),
-        image: impl FnOnce() -> SwashImage,
+        subpx: (u8, u8),
+        image: impl FnOnce() -> GlyphImage,
         paint_index: PaintIndex,
     ) {
         let info = self
@@ -628,6 +719,36 @@ impl Vger {
                 (rect.y + rect.height) as f32,
             ];
             prim.paint = paint_index.index as u32;
+            prim.scissor = self.add_scissor() as u32;
+
+            self.render(prim);
+        }
+    }
+
+    pub fn render_image(
+        &mut self,
+        x: f32,
+        y: f32,
+        hash: &[u8],
+        width: u32,
+        height: u32,
+        image_fn: impl FnOnce() -> Image,
+    ) {
+        let info = self.glyph_cache.get_image_mask(hash, image_fn);
+        if let Some(rect) = info.rect {
+            let mut prim = Prim::default();
+            prim.prim_type = PrimType::ColorGlyph as u32;
+
+            let x = x + info.left as f32;
+            let y = y - info.top as f32;
+            prim.quad_bounds = [x, y, x + width as f32, y + height as f32];
+
+            prim.tex_bounds = [
+                rect.x as f32,
+                rect.y as f32,
+                (rect.x + rect.width) as f32,
+                (rect.y + rect.height) as f32,
+            ];
             prim.scissor = self.add_scissor() as u32;
 
             self.render(prim);
@@ -671,138 +792,6 @@ impl Vger {
 
             self.render(prim);
         }
-    }
-
-    /// Renders text.
-    pub fn text(&mut self, text: &str, size: u32, color: Color, max_width: Option<f32>) {
-        self.setup_layout(text, size, max_width);
-
-        let scale = self.device_px_ratio;
-        let scaled_size = size as f32 * scale;
-
-        let paint = self.color_paint(color);
-        let scissor = self.add_scissor() as u32;
-
-        let mut prims = vec![];
-        for (i, glyph) in self.layout.glyphs().iter().enumerate() {
-            let c = text.chars().nth(i).unwrap();
-            // println!("glyph {:?}", c);
-            let info = self.glyph_cache.get_glyph(c, scaled_size);
-
-            if let Some(rect) = info.rect {
-                let mut prim = Prim::default();
-                prim.prim_type = PrimType::Glyph as u32;
-                prim.scissor = scissor;
-                assert!(glyph.width == rect.width as usize);
-                assert!(glyph.height == rect.height as usize);
-
-                prim.quad_bounds = [
-                    glyph.x / scale,
-                    glyph.y / scale,
-                    (glyph.x + glyph.width as f32) / scale,
-                    (glyph.y + glyph.height as f32) / scale,
-                ];
-                // println!("quad_bounds: {:?}", prim.quad_bounds);
-
-                prim.tex_bounds = [
-                    rect.x as f32,
-                    (rect.y + rect.height) as f32,
-                    (rect.x + rect.width) as f32,
-                    rect.y as f32,
-                ];
-                prim.paint = paint.index as u32;
-                // println!("tex_bounds: {:?}", prim.tex_bounds);
-
-                prims.push(prim);
-            }
-        }
-
-        for prim in prims {
-            self.render(prim);
-        }
-    }
-
-    /// Calculates the bounds for text.
-    pub fn text_bounds(&mut self, text: &str, size: u32, max_width: Option<f32>) -> LocalRect {
-        self.setup_layout(text, size, max_width);
-
-        let mut min = LocalPoint::new(f32::MAX, f32::MAX);
-        let mut max = LocalPoint::new(f32::MIN, f32::MIN);
-
-        let scale = self.device_px_ratio;
-
-        for glyph in self.layout.glyphs() {
-            min = min.min([glyph.x / scale, glyph.y / scale].into());
-            max = max.max(
-                [
-                    (glyph.x + glyph.width as f32) / scale,
-                    (glyph.y + glyph.height as f32) / scale,
-                ]
-                .into(),
-            );
-        }
-
-        LocalRect::new(min, (max - min).into())
-    }
-
-    /// Returns local coordinates of glyphs.
-    pub fn glyph_positions(
-        &mut self,
-        text: &str,
-        size: u32,
-        max_width: Option<f32>,
-    ) -> Vec<LocalRect> {
-        let mut rects = Vec::with_capacity(text.len());
-
-        self.setup_layout(text, size, max_width);
-
-        let s = 1.0 / self.device_px_ratio;
-
-        for glyph in self.layout.glyphs() {
-            rects.push(
-                LocalRect::new(
-                    [glyph.x, glyph.y].into(),
-                    [glyph.width as f32, glyph.height as f32].into(),
-                )
-                .scale(s, s),
-            )
-        }
-
-        rects
-    }
-
-    pub fn line_metrics(
-        &mut self,
-        text: &str,
-        size: u32,
-        max_width: Option<f32>,
-    ) -> Vec<LineMetrics> {
-        self.setup_layout(text, size, max_width);
-        let s = 1.0 / self.device_px_ratio;
-
-        let mut rects = Vec::with_capacity(text.len());
-
-        let glyphs = self.layout.glyphs();
-
-        if let Some(lines) = self.layout.lines() {
-            for line in lines {
-                let mut rect = LocalRect::zero();
-
-                for glyph in glyphs.iter().take(line.glyph_end).skip(line.glyph_start) {
-                    rect = rect.union(&LocalRect::new(
-                        [glyph.x, glyph.y].into(),
-                        [glyph.width as f32, glyph.height as f32].into(),
-                    ));
-                }
-                rects.push(LineMetrics {
-                    glyph_start: line.glyph_start,
-                    glyph_end: line.glyph_end,
-                    bounds: rect.scale(s, s),
-                });
-            }
-        }
-
-        rects
     }
 
     fn add_xform(&mut self) -> usize {
@@ -851,25 +840,26 @@ impl Vger {
         }
     }
 
+    pub fn set_z_index(&mut self, z_index: i32) {
+        self.cur_z_index = z_index;
+    }
+
     /// Gets the current transform.
     pub fn current_transform(&self) -> LocalToWorld {
         *self.tx_stack.last().unwrap()
     }
 
     /// Sets the current scissor rect.
-    pub fn scissor(&mut self, rect: LocalRect) {
+    pub fn scissor(&mut self, rect: LocalRect, radius: f32) {
         if let Some(m) = self.scissor_stack.last_mut() {
             *m = Scissor::new();
             if let Some(xform) = self.tx_stack.last().unwrap().inverse() {
                 m.xform = xform;
                 m.origin = rect.origin.to_array();
                 m.size = rect.size.to_array();
+                m.radius = radius;
             }
         }
-    }
-
-    pub fn set_z_index(&mut self, z_index: i32) {
-        self.cur_z_index = z_index;
     }
 
     /// Resets the current scissor rect.
@@ -912,9 +902,98 @@ impl Vger {
             glow,
         ))
     }
+
+    /// Create an image from pixel data in memory.
+    /// Must be RGBA8.
+    pub fn create_image_pixels(&mut self, data: &[u8], width: u32, height: u32) -> ImageIndex {
+        let texture_size = wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        };
+
+        let texture_desc = wgpu::TextureDescriptor {
+            size: texture_size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::TEXTURE_BINDING,
+            label: Some("lyte image"),
+            view_formats: &[wgpu::TextureFormat::Rgba8UnormSrgb],
+        };
+
+        let texture = self.device.create_texture(&texture_desc);
+
+        let buffer = self
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: Some("Temp Buffer"),
+                contents: data,
+                usage: wgpu::BufferUsages::COPY_SRC,
+            });
+
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("texture_buffer_copy_encoder"),
+            });
+
+        let image_size = wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        };
+
+        encoder.copy_buffer_to_texture(
+            wgpu::TexelCopyBufferInfo {
+                buffer: &buffer,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(width * 4),
+                    rows_per_image: Some(height),
+                },
+            },
+            wgpu::TexelCopyTextureInfo {
+                texture: &texture,
+                mip_level: 0,
+                aspect: wgpu::TextureAspect::All,
+                origin: wgpu::Origin3d::ZERO,
+            },
+            image_size,
+        );
+
+        self.queue.submit(std::iter::once(encoder.finish()));
+
+        let index = ImageIndex {
+            index: self.images.len(),
+        };
+
+        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        self.images.push(Some(texture));
+
+        let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &self.cache_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::TextureView(&texture_view),
+            }],
+            label: Some("vger bind group"),
+        });
+
+        self.image_bind_groups.push(Some(bind_group));
+
+        index
+    }
+
+    pub fn delete_image(&mut self, image: ImageIndex) {
+        self.images[image.index] = None;
+        self.image_bind_groups[image.index] = None;
+    }
 }
 
-#[derive(Hash, Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Default)]
+#[derive(Hash, Clone, Copy, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
 #[repr(u8)]
 pub enum SubpixelOffset {
     #[default]
