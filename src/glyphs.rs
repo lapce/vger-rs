@@ -38,12 +38,14 @@ pub struct GlyphCache {
     pub size: u32,
     pub mask_atlas: Atlas,
     pub color_atlas: Atlas,
+    #[allow(clippy::type_complexity)]
     glyph_infos: HashMap<
         (
             u64,      // font blob id
             u16,      // glyph id
             u32,      // font size
             (u8, u8), // subpixel bins (x, y)
+            u32,      // synthesis bits (embolden flag + skew)
         ),
         AtlasInfo,
     >,
@@ -117,15 +119,21 @@ impl GlyphCache {
         info
     }
 
+    /// Look up or rasterize a glyph.
+    ///
+    /// `synthesis` is an opaque discriminator that differentiates glyphs
+    /// rendered with different synthesis settings (e.g. faux bold or italic).
+    /// Callers should encode embolden state and skew angle into this value.
     pub fn get_glyph_mask(
         &mut self,
         font_id: u64,
         glyph_id: u16,
         size: u32,
         subpx: (u8, u8),
+        synthesis: u32,
         image: impl FnOnce() -> GlyphImage,
     ) -> AtlasInfo {
-        let key = (font_id, glyph_id, size, subpx);
+        let key = (font_id, glyph_id, size, subpx, synthesis);
         if let Some(rect) = self.glyph_infos.get(&key) {
             return *rect;
         }

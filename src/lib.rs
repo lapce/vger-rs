@@ -26,7 +26,7 @@ pub mod atlas;
 mod glyphs;
 
 use glyphs::GlyphCache;
-pub use glyphs::{Image, PixelFormat, GlyphImage};
+pub use glyphs::{GlyphImage, Image, PixelFormat};
 
 use wgpu::util::DeviceExt;
 
@@ -683,6 +683,11 @@ impl Vger {
         self.path_scanner.segments.clear();
     }
 
+    /// Render a glyph at the given screen-space position.
+    ///
+    /// `synthesis` is an opaque discriminator for the glyph cache that
+    /// differentiates glyphs rendered with different synthesis settings
+    /// (e.g. faux bold or italic). Pass 0 when no synthesis is applied.
     #[allow(clippy::too_many_arguments)]
     pub fn render_glyph(
         &mut self,
@@ -692,12 +697,13 @@ impl Vger {
         glyph_id: u16,
         size: u32,
         subpx: (u8, u8),
+        synthesis: u32,
         image: impl FnOnce() -> GlyphImage,
         paint_index: PaintIndex,
     ) {
         let info = self
             .glyph_cache
-            .get_glyph_mask(font_id, glyph_id, size, subpx, image);
+            .get_glyph_mask(font_id, glyph_id, size, subpx, synthesis, image);
         if let Some(rect) = info.rect {
             let mut prim = Prim::default();
             prim.prim_type = if info.colored {
