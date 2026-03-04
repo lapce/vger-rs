@@ -1,28 +1,26 @@
-[workspace]
-resolver = "2" # What does this do?
-
 [package]
 name = "floem-vger"
 description = "Unofficial vger fork for Floem"
-version = "0.3.1"
+version = "0.3.2"
 license = "MIT"
 readme = "README.md"
 authors = ["Taylor Holliday <taylor@audulus.com>"]
 repository = "https://github.com/audulus/vger-rs"
-edition = "2018"
+edition = "2024"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-wgpu = "26.0.1"
-euclid = "0.22.11"
-fontdue = "0.9.3"
-rect_packer = "0.2.1"
-cosmic-text = "0.14.2"
+wgpu = "27"
+euclid = "0.22"
+fontdue = "0.9"
+rect_packer = "0.2"
+linebender_resource_handle = "0.1"
+
 
 [dev-dependencies]
-png = "0.17.16"
+png = "0.17"
 futures = "0.3"
 futures-intrusive = "0.5"
-svg = "0.13.1"
-rand = "0.8.5"
+svg = "0.13"
+rand = "0.8"
+fontdue = "0.9"

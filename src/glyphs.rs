@@ -1,5 +1,5 @@
 use crate::atlas::{Atlas, AtlasContent};
-use cosmic_text::{SubpixelBin, SwashContent, SwashImage};
+use linebender_resource_handle::Blob;
 use rect_packer::Rect;
 use std::collections::HashMap;
 
@@ -19,20 +19,33 @@ pub enum PixelFormat {
 pub struct Image {
     pub width: u32,
     pub height: u32,
-    pub data: Vec<u8>,
+    pub data: Blob<u8>,
     pub pixel_format: PixelFormat,
+}
+
+/// Rasterized glyph image data (replaces cosmic_text::SwashImage).
+pub struct GlyphImage {
+    pub data: Blob<u8>,
+    pub width: u32,
+    pub height: u32,
+    pub left: i32,
+    pub top: i32,
+    /// true = color glyph (goes in color atlas), false = mask glyph (goes in mask atlas)
+    pub colored: bool,
 }
 
 pub struct GlyphCache {
     pub size: u32,
     pub mask_atlas: Atlas,
     pub color_atlas: Atlas,
+    #[allow(clippy::type_complexity)]
     glyph_infos: HashMap<
         (
-            cosmic_text::fontdb::ID,
-            u16,
-            u32,
-            (SubpixelBin, SubpixelBin),
+            u64,      // font blob id
+            u16,      // glyph id
+            u32,      // font size
+            (u8, u8), // subpixel bins (x, y)
+            u32,      // synthesis bits (embolden flag + skew)
         ),
         AtlasInfo,
     >,
@@ -61,7 +74,7 @@ impl GlyphCache {
         let image = image_fn();
         let rect = self
             .color_atlas
-            .add_region(&image.data, image.width, image.height);
+            .add_region(image.data.data(), image.width, image.height);
         let info = AtlasInfo {
             rect,
             left: 0,
@@ -106,37 +119,38 @@ impl GlyphCache {
         info
     }
 
+    /// Look up or rasterize a glyph.
+    ///
+    /// `synthesis` is an opaque discriminator that differentiates glyphs
+    /// rendered with different synthesis settings (e.g. faux bold or italic).
+    /// Callers should encode embolden state and skew angle into this value.
     pub fn get_glyph_mask(
         &mut self,
-        font_id: cosmic_text::fontdb::ID,
+        font_id: u64,
         glyph_id: u16,
         size: u32,
-        subpx: (SubpixelBin, SubpixelBin),
-        image: impl FnOnce() -> SwashImage,
+        subpx: (u8, u8),
+        synthesis: u32,
+        image: impl FnOnce() -> GlyphImage,
     ) -> AtlasInfo {
-        let key = (font_id, glyph_id, size, subpx);
+        let key = (font_id, glyph_id, size, subpx, synthesis);
         if let Some(rect) = self.glyph_infos.get(&key) {
             return *rect;
         }
 
         let image = image();
-        let rect = match image.content {
-            SwashContent::Mask => self.mask_atlas.add_region(
-                &image.data,
-                image.placement.width,
-                image.placement.height,
-            ),
-            SwashContent::SubpixelMask | SwashContent::Color => self.color_atlas.add_region(
-                &image.data,
-                image.placement.width,
-                image.placement.height,
-            ),
+        let rect = if image.colored {
+            self.color_atlas
+                .add_region(image.data.data(), image.width, image.height)
+        } else {
+            self.mask_atlas
+                .add_region(image.data.data(), image.width, image.height)
         };
         let info = AtlasInfo {
             rect,
-            left: image.placement.left,
-            top: image.placement.top,
-            colored: image.content != SwashContent::Mask,
+            left: image.left,
+            top: image.top,
+            colored: image.colored,
         };
         self.glyph_infos.insert(key, info);
         info

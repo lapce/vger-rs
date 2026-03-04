@@ -41,7 +41,7 @@ pub async fn create_png(
     // Poll the device in a blocking manner so that our future resolves.
     // In an actual application, `device.poll(...)` should
     // be called in an event loop or on another thread.
-    device.poll(wgpu::PollType::Wait).unwrap();
+    device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
     // If a file system is available, write the buffer as a PNG
     let has_file_system_available = cfg!(not(target_arch = "wasm32"));
     if !has_file_system_available {
@@ -120,7 +120,7 @@ fn get_texture_data(
 
     queue.submit(Some(command_buffer));
 
-    device.poll(wgpu::PollType::Wait).unwrap();
+    device.poll(wgpu::PollType::wait_indefinitely()).unwrap();
 
     output_buffer
 }
@@ -166,7 +166,7 @@ pub fn render_test(
             resolve_target: None,
             ops: wgpu::Operations {
                 load: wgpu::LoadOp::Clear(wgpu::Color::BLACK),
-                store: StoreOp::Discard,
+                store: StoreOp::Store,
             },
             depth_slice: None,
         })],

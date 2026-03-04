@@ -1,4 +1,3 @@
-use cosmic_text::{SubpixelBin, SwashImage};
 use std::sync::Arc;
 
 mod path;
@@ -27,7 +26,7 @@ pub mod atlas;
 mod glyphs;
 
 use glyphs::GlyphCache;
-pub use glyphs::{Image, PixelFormat};
+pub use glyphs::{GlyphImage, Image, PixelFormat};
 
 use wgpu::util::DeviceExt;
 
@@ -302,7 +301,7 @@ impl Vger {
         let mask_texture_view = glyph_cache.mask_atlas.create_view();
         let color_texture_view = glyph_cache.color_atlas.create_view();
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -315,9 +314,7 @@ impl Vger {
                 },
             ],
             label: Some("vger cache bind group"),
-        });
-
-        bind_group
+        })
     }
 
     /// Begin rendering.
@@ -686,21 +683,27 @@ impl Vger {
         self.path_scanner.segments.clear();
     }
 
+    /// Render a glyph at the given screen-space position.
+    ///
+    /// `synthesis` is an opaque discriminator for the glyph cache that
+    /// differentiates glyphs rendered with different synthesis settings
+    /// (e.g. faux bold or italic). Pass 0 when no synthesis is applied.
     #[allow(clippy::too_many_arguments)]
     pub fn render_glyph(
         &mut self,
         x: f32,
         y: f32,
-        font_id: cosmic_text::fontdb::ID,
+        font_id: u64,
         glyph_id: u16,
         size: u32,
-        subpx: (SubpixelBin, SubpixelBin),
-        image: impl FnOnce() -> SwashImage,
+        subpx: (u8, u8),
+        synthesis: u32,
+        image: impl FnOnce() -> GlyphImage,
         paint_index: PaintIndex,
     ) {
         let info = self
             .glyph_cache
-            .get_glyph_mask(font_id, glyph_id, size, subpx, image);
+            .get_glyph_mask(font_id, glyph_id, size, subpx, synthesis, image);
         if let Some(rect) = info.rect {
             let mut prim = Prim::default();
             prim.prim_type = if info.colored {
