@@ -10,7 +10,7 @@ edition = "2024"
 
 
 [dependencies]
-wgpu = "28"
+wgpu = "29"
 euclid = "0.22"
 fontdue = "0.9"
 rect_packer = "0.2"

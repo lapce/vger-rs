@@ -216,13 +216,14 @@ impl Vger {
 
         let cache_bind_group =
             Self::get_cache_bind_group(&device, &glyph_cache, &cache_bind_group_layout);
+        let scene_bind_group_layout = Scene::bind_group_layout(&device);
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
             bind_group_layouts: &[
-                &Scene::bind_group_layout(&device),
-                &uniform_bind_group_layout,
-                &cache_bind_group_layout,
+                Some(&scene_bind_group_layout),
+                Some(&uniform_bind_group_layout),
+                Some(&cache_bind_group_layout),
             ],
             immediate_size: 0,
         });

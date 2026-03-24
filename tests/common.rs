@@ -4,9 +4,9 @@ use std::fs::File;
 use wgpu::StoreOp;
 
 pub async fn setup() -> (wgpu::Device, wgpu::Queue) {
-    let instance_desc = wgpu::InstanceDescriptor::default();
+    let instance_desc = wgpu::InstanceDescriptor::new_without_display_handle();
 
-    let instance = wgpu::Instance::new(&instance_desc);
+    let instance = wgpu::Instance::new(instance_desc);
 
     let adapter = wgpu::util::initialize_adapter_from_env_or_default(&instance, None)
         .await
@@ -174,6 +174,7 @@ pub fn render_test(
         multiview_mask: None,
         timestamp_writes: None,
         occlusion_query_set: None,
+        multiview_mask: None,
     };
 
     vger.encode(&desc);
