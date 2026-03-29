@@ -16,10 +16,10 @@ pub(crate) struct Scene {
     pub bind_groups: [wgpu::BindGroup; MAX_LAYERS],
 }
 
-pub const MAX_PRIMS: usize = 65536;
+pub const MAX_PRIMS: usize = 65536 * 10;
 
 // Initial prim capacity.
-pub const INIT_PRIMS: usize = 1024;
+pub const INIT_PRIMS: usize = 1024 * 10;
 
 impl Scene {
     pub fn new(device: &wgpu::Device) -> Self {
