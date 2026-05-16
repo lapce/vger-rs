@@ -228,9 +228,21 @@ impl Vger {
             immediate_size: 0,
         });
 
-        let blend_comp = wgpu::BlendComponent {
+        // Color uses straight-alpha source-over: src.rgb * src.a + dst.rgb * (1 - src.a).
+        let color_blend = wgpu::BlendComponent {
             operation: wgpu::BlendOperation::Add,
             src_factor: wgpu::BlendFactor::SrcAlpha,
+            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+        };
+        // Alpha must use One + OneMinusSrcAlpha so the framebuffer alpha
+        // becomes `src.a + dst.a * (1 - src.a)`. The previous symmetric blend
+        // (`SrcAlpha` for both channels) squared the alpha — `src.a² + …` —
+        // so antialiased SDF / text edges with conceptual coverage `c` wrote
+        // alpha `c²` to the framebuffer, leaving the desktop visible through
+        // every glyph edge on a transparent (PreMultiplied) Wayland surface.
+        let alpha_blend = wgpu::BlendComponent {
+            operation: wgpu::BlendOperation::Add,
+            src_factor: wgpu::BlendFactor::One,
             dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
         };
 
@@ -249,8 +261,8 @@ impl Vger {
                 targets: &[Some(wgpu::ColorTargetState {
                     format: texture_format,
                     blend: Some(wgpu::BlendState {
-                        color: blend_comp,
-                        alpha: blend_comp,
+                        color: color_blend,
+                        alpha: alpha_blend,
                     }),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
